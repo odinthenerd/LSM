@@ -1,4 +1,8 @@
 #pragma once
+#include "../Lib/Sm/All.hpp"
+#pragma warning(disable : 4503)
+#pragma warning(disable : 4700)
+
 
 
 constexpr struct Init {} *init{};
@@ -11,6 +15,7 @@ auto makeHD44780sm(Config config) {
 	struct Uninitialized {} *uninitialized;
 	struct Initialized {} *initialized;
 	struct WaitingForCompletion {} *waitingForCompletion;
+	struct Printing { const char* begin_; int end_; } *printing;
 	using namespace Kvasir::Sm;
 
 	auto setEnableWait = [](auto& context) {
@@ -21,26 +26,26 @@ auto makeHD44780sm(Config config) {
 	};
 
 	auto enableWait = chain(
-		enableWait,
-		guard % event = timer
+		setEnableWait,
+		guard % event == timer
 		);
 	auto resetWait = chain(
-		resetWait,
-		guard % event = timer
+		setResetWait,
+		guard % event == timer
 		);
 
 	auto toggleEnable = chain(
 		enableWait,
-		set(Config::pin),
+		set(Config::enable),
 		enableWait,
-		clear(Config::pin),
+		clear(Config::enable),
 		enableWait
 		);
 
 	auto reset = chain(
-		makeOutput(Config::port), 
+		//makeOutput(Config::port), 
 		clear(Config::enable, Config::readWrite, Config::reset), 
-		write(Config::port, _3),
+		//write(Config::port, _3),
 		toggleEnable,
 		resetWait,
 		guard % event == init,
@@ -60,49 +65,64 @@ auto makeHD44780sm(Config config) {
 		transition( uninitialized, initialized,
 			guard % event == init,
 			reset,
-			write(Config::port, _2),
+			//write(Config::port, _2),
 			toggleEnable,
 			resetWait,
 			//function set
-			write(Config::port, Config::functionSetH),
-			togggleEnable,
-			write(Config::port, Config::functionSetL),
+			//write(Config::port, Config::functionSetH),
+			toggleEnable,
+			//write(Config::port, Config::functionSetL),
 			toggleEnable,
 			resetWait,
 			//turn off display
-			write(Config::port, _0),
-			togggleEnable,
-			write(Config::port, _8),
+			//write(Config::port, _0),
+			toggleEnable,
+			//write(Config::port, _8),
 			toggleEnable,
 			resetWait,
 			//clear display
-			write(Config::port, _0),
-			togggleEnable,
-			write(Config::port, _1),
+			//write(Config::port, _0),
+			toggleEnable,
+			//write(Config::port, _1),
 			toggleEnable,
 			resetWait,
 			//entry mode
-			write(Config::port, Config::entryModeH),
-			togggleEnable,
-			write(Config::port, Config::entryModeL),
+			//write(Config::port, Config::entryModeH),
+			toggleEnable,
+			//write(Config::port, Config::entryModeL),
 			toggleEnable,
 			resetWait,
 			//turn on display
-			write(Config::port, _0),
-			togggleEnable,
-			write(Config::port, _8),
+			//write(Config::port, _0),
+			toggleEnable,
+			//write(Config::port, _8),
 			toggleEnable,
 			resetWait
-			)
+			),
 		//set cursor to position
-		transition(initialized,waitForCompletion,  
+		transition(initialized, waitingForCompletion,
 			guard % event == setCursorToPosition,
 			clear(Config::reset,Config::readWrite),
-			makeOutput(Config::port),
-			[](SetCursorToPosition* e) { apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)) >> 4)); },
+			//makeOutput(Config::port),
+			[](SetCursorToPosition* e) { /*apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)) >> 4));*/ },
 			toggleEnable,
-			[](SetCursorToPosition* e) { apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)))); },
-			toggleEnable,
+			[](SetCursorToPosition* e) { /*apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y))));*/ },
+			toggleEnable
+			),
+		//print
+		transition(initialized, printing,
+			guard % [](Print* p) { return p->data_[0] != '\0'; }	//only if event is print and buf is not empty
+			),
+		state % printing + [](auto& c, Print* p){
+				c.me.begin_ = p->data_;
+				c.me.end_ = p->data_ + strlen(p->data_);
+				//apply(set(Config::reset),clear(Config::readWrite), makeOutput(Config::port));
+				//apply(write(Config::port, *c.me.begin_ >> 4));
+				c.enableWait();
+			},
+		transition(printing,printing,
+			guard % [](auto& c, Timer*) {c.me.begin_ != c.me.end_; }
+
 			)
 		);
 }
