@@ -49,7 +49,7 @@ auto sm = makeSm(
         
 ```
 
-because we can specify actions and guards inline using lambdas the code becomes much more readable. The other main innovation is the addition of a "multi step transition". Depending on the design we often see a pattern of action, wit for event, action, wait for another event, where the order of actions and events we are waiting for are pretty fixed and linier. For example:
+because we can specify actions and guards inline using lambdas the code becomes much more readable. The other main innovation is the addition of a "multi step transition". Depending on the design we often see a pattern of action, wait for event, action, wait for another event, where the order of actions and events we are waiting for are pretty fixed and linier. For example:
 
 - find database
  - database found
@@ -62,6 +62,26 @@ because we can specify actions and guards inline using lambdas the code becomes 
 - perform other quirey
  - success
 
-Looking at this we can see that we are only ever waiting for one particular event each time, if another event occurrs we hav eno hope of handeling it, in fact it probably means either an error or the user has canceled the request. In that case its best to roll back all the changes we have made so far (close the database etc.). 
+Looking at this we can see that we are only ever waiting for one particular event each time, if another event occurrs we have no hope of handeling it, in fact it probably means either an error or the user has canceled the request. In that case its best to roll back all the changes we have made so far (close the database etc.). 
 
 For this (pretty common) special case we provide multistep transitions. Internally they are just a lot of substates in the origin state.
+
+This is what the multistep transition would look like (assuming names lambdas exist for actions and guards):
+```C++
+transition(a,b,
+    guard % userWantsToQuiry, 
+    findDatabase,
+    guard % databaseFound,
+    openDatabase,
+    guard % success,
+    rollback % closeDatabase,
+    openTable,
+    guard % success,
+    rollback % closeTable,
+    performQuery,
+    guard % success,
+    performOtherQuirey,
+    guard % success,
+    postResultToSomewhere)
+    
+```
