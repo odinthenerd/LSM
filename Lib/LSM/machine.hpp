@@ -5,8 +5,8 @@ Distributed under the Boost Software License, Version 1.0.
 =================================================================================================**/
 
 #pragma once
-#include "Factories.hpp"
 #include "Types.hpp"
-#include "Utility.hpp"
-#include "Machine.hpp"
 
+namespace LSM {
+	auto make()->int { return 0; }
+}
