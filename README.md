@@ -15,7 +15,7 @@ struct Ev2{};            //event
 auto myGuard = [](Ev1&){};
 auto doSomethingElse = []{};
 struct MyFunctor{
-    void operator(Ev2*){}
+    void operator(Ev2&){}
 };
 auto sm = makeSm(
     state<A>(entry = [](auto& context){}, exit = []{}),
