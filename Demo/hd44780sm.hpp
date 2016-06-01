@@ -5,17 +5,17 @@
 
 
 
-constexpr struct Init {} *init{};
-constexpr struct Print { const char*data_; } *print{};
-constexpr struct SetCursorToPosition { unsigned char x, y; } *setCursorToPosition{};
-constexpr struct Timer {} *timer{};
+struct Init {};
+struct Print { const char*data_; };
+struct SetCursorToPosition { unsigned char x, y; };
+struct Timer {};
 
 template<typename Config>
 auto makeHD44780sm(Config config) {
-	struct Uninitialized {} *uninitialized;
-	struct Initialized {} *initialized;
-	struct WaitingForCompletion {} *waitingForCompletion;
-	struct Printing { const char* begin_; int end_; } *printing;
+	struct Uninitialized {};
+	struct Initialized {};
+	struct WaitingForCompletion {};
+	struct Printing { const char* begin_; int end_; };
 	using namespace Kvasir::Sm;
 
 	auto setEnableWait = [](auto& context) {
@@ -27,11 +27,11 @@ auto makeHD44780sm(Config config) {
 
 	auto enableWait = chain(
 		setEnableWait,
-		guard % event == timer
+		guard = event == timer
 		);
 	auto resetWait = chain(
 		setResetWait,
-		guard % event == timer
+		guard = event == timer
 		);
 
 	auto toggleEnable = chain(
@@ -43,85 +43,84 @@ auto makeHD44780sm(Config config) {
 		);
 
 	auto reset = chain(
-		//makeOutput(Config::port), 
+		makeOutput(Config::port), 
 		clear(Config::enable, Config::readWrite, Config::reset), 
-		//write(Config::port, _3),
+		write(Config::port, 3_c),
 		toggleEnable,
 		resetWait,
-		guard % event == init,
+		guard = event == init,
 		toggleEnable,
 		resetWait,
-		guard % event == init,
+		guard = event == init,
 		toggleEnable,
 		resetWait,
-		guard % event == init);
+		guard = event == init);
 
 	return make(
 		config, //root state
-		state % uninitialized,
-		state % initialized,
-		state % waitingForCompletion,
+		state<Uninitialized>,
+		state<Initialized>,
+		state<WaitingForCompletion>,
 		//initialize
-		transition( uninitialized, initialized,
-			guard % event == init,
+		transition( state<Uninitialized>, state<Initialized>,
+			guard = event == init,
 			reset,
-			//write(Config::port, _2),
+			write(Config::port, 2_c),
 			toggleEnable,
 			resetWait,
 			//function set
-			//write(Config::port, Config::functionSetH),
+			write(Config::port, Config::functionSetH),
 			toggleEnable,
-			//write(Config::port, Config::functionSetL),
+			write(Config::port, Config::functionSetL),
 			toggleEnable,
 			resetWait,
 			//turn off display
-			//write(Config::port, _0),
+			write(Config::port, 0_c),
 			toggleEnable,
-			//write(Config::port, _8),
+			write(Config::port, 8_c),
 			toggleEnable,
 			resetWait,
 			//clear display
-			//write(Config::port, _0),
+			write(Config::port, 0_c),
 			toggleEnable,
-			//write(Config::port, _1),
+			write(Config::port, 1_c),
 			toggleEnable,
 			resetWait,
 			//entry mode
-			//write(Config::port, Config::entryModeH),
+			write(Config::port, Config::entryModeH),
 			toggleEnable,
-			//write(Config::port, Config::entryModeL),
+			write(Config::port, Config::entryModeL),
 			toggleEnable,
 			resetWait,
 			//turn on display
-			//write(Config::port, _0),
+			write(Config::port, 0_c),
 			toggleEnable,
-			//write(Config::port, _8),
+			write(Config::port, 8_c),
 			toggleEnable,
 			resetWait
 			),
 		//set cursor to position
 		transition(initialized, waitingForCompletion,
-			guard % event == setCursorToPosition,
+			guard = event == setCursorToPosition,
 			clear(Config::reset,Config::readWrite),
-			//makeOutput(Config::port),
-			[](SetCursorToPosition* e) { /*apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)) >> 4));*/ },
+			makeOutput(Config::port),
+			[](SetCursorToPosition& e) { apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)) >> 4)); },
 			toggleEnable,
-			[](SetCursorToPosition* e) { /*apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y))));*/ },
+			[](SetCursorToPosition& e) { apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)))); },
 			toggleEnable
 			),
 		//print
-		transition(initialized, printing,
-			guard % [](Print* p) { return p->data_[0] != '\0'; }	//only if event is print and buf is not empty
+		transition(state<Initialized>, state<Printing>,
+			guard = [](Print* p) { return p->data_[0] != '\0'; }	//only if event is print and buf is not empty
 			),
-		state % printing + [](auto& c, Print* p){
+		state<Printing>(entry = [](auto& c, Print* p){
 				c.me.begin_ = p->data_;
 				c.me.end_ = p->data_ + strlen(p->data_);
-				//apply(set(Config::reset),clear(Config::readWrite), makeOutput(Config::port));
-				//apply(write(Config::port, *c.me.begin_ >> 4));
+				apply(set(Config::reset),clear(Config::readWrite), makeOutput(Config::port));
+				apply(write(Config::port, *c.me.begin_ >> 4));
 				c.enableWait();
-			},
-		transition(printing,printing,
-			guard % [](auto& c, Timer*) {c.me.begin_ != c.me.end_; }
+			}),
+		transition(state<Printing>,guard = [](auto& c, Timer*) {c.me.begin_ != c.me.end_; }
 
 			)
 		);
