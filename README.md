@@ -6,10 +6,7 @@ The basic idea is to use a factory function to build a state machine out of lamb
 Lets explain things with code:
 
 ```C++
-struct A{};            //state
-struct B{ int i; };            //state can have data
-struct C{};            //state
-struct C{};            //state
+struct StateData{ int i; };            //state can have data
 struct Ev1{ int i; };            //event can have data
 struct Ev2{};            //event
 auto myGuard = [](Ev1&){};
@@ -18,15 +15,15 @@ struct MyFunctor{
     void operator(Ev2&){}
 };
 auto sm = makeSm(
-    state<A>(entry = [](auto& context){}, exit = []{}),
-    state<B>(), //we can leave out entry and exit if we don't need them
+    "someState"_s(data = StateData(), entry = [](auto& context){}, exit = []{}),
+    "otherState"_s, //we can leave out entry and exit if we don't need them
     
     //can overload onEntry depending on event type
-    state<C>{entry = [](auto& context, Ev2*){ /*only used if entry from an ev2*/}, entry = [](auto& context, void*){ /*used in all other cases*/}},
+    "anotherState"_s{entry = [](auto& context, Ev2*){ /*only used if entry from an ev2*/}, entry = [](auto& context, void*){ /*used in all other cases*/}},
     //states can also have parent states
-    state<B>/state<D>(entry = doSomethingElse),  //state d is a substate of state b
-    transition(state<A>,state<B>, guard = [](Ev1*e){ return e->i ==4;}), //normal transition with guard
-    transition(state<B>,state<C>, //multistep transition is a shortcut syntag for defining a long chain of transition 
+    "someState"_s/"childState"_s(entry = doSomethingElse),  //state d is a substate of state b
+    transition("someState"_s,"otherState"_s, guard = [](Ev1*e){ return e->i ==4;}), //normal transition with guard
+    transition("otherState"_s,"anotherState"_s, //multistep transition is a shortcut syntax for defining a long chain of transition 
         guard = event == ev2,  //we can also use shortcut 'event==' syntax for simple guards,
         []{ /*do something*/ }, //everything that is not a guard or rollback is an action
         action = doSomethingElse, //we can have one or more actions and actions can be explicit
@@ -62,7 +59,7 @@ For this (pretty common) special case we provide multistep transitions. Internal
 
 This is what the multistep transition would look like (assuming named lambdas exist for actions and guards):
 ```C++
-transition(state<NotConnected>,state<Done>,
+transition("NotConnected"_s,"Done"_s>,
     guard = userWantsToQuiry, 
     findDatabase,
     guard = databaseFound,
