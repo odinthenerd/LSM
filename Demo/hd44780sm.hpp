@@ -12,11 +12,8 @@ struct Timer {};
 
 template<typename Config>
 auto makeHD44780sm(Config config) {
-	struct Uninitialized {};
-	struct Initialized {};
-	struct WaitingForCompletion {};
 	struct Printing { const char* begin_; int end_; };
-	using namespace Kvasir::Sm;
+	using namespace LSM;
 
 	auto setEnableWait = [](auto& context) {
 		context.enableWait();
@@ -58,11 +55,11 @@ auto makeHD44780sm(Config config) {
 
 	return make(
 		config, //root state
-		state<Uninitialized>,
-		state<Initialized>,
-		state<WaitingForCompletion>,
+		"Uninitialized"_s,
+		"Initialized"_s,
+		"WaitingForCompletion"_s,
 		//initialize
-		transition( state<Uninitialized>, state<Initialized>,
+		transition( "Uninitialized"_s, "Initialized"_s,
 			guard = event == init,
 			reset,
 			write(Config::port, 2_c),
@@ -100,7 +97,7 @@ auto makeHD44780sm(Config config) {
 			resetWait
 			),
 		//set cursor to position
-		transition(initialized, waitingForCompletion,
+		transition("Initialized"_s, "WaitingForCompletion"_s,
 			guard = event == setCursorToPosition,
 			clear(Config::reset,Config::readWrite),
 			makeOutput(Config::port),
@@ -109,19 +106,18 @@ auto makeHD44780sm(Config config) {
 			[](SetCursorToPosition& e) { apply(write(Config::port, (0x80 | (e->x * 0x40 + e->y)))); },
 			toggleEnable
 			),
-		//print
-		transition(state<Initialized>, state<Printing>,
-			guard = [](Print* p) { return p->data_[0] != '\0'; }	//only if event is print and buf is not empty
-			),
-		state<Printing>(entry = [](auto& c, Print* p){
+		"Printing"_s(Printing(), entry = [](auto& c, Print* p){
 				c.me.begin_ = p->data_;
 				c.me.end_ = p->data_ + strlen(p->data_);
 				apply(set(Config::reset),clear(Config::readWrite), makeOutput(Config::port));
 				apply(write(Config::port, *c.me.begin_ >> 4));
 				c.enableWait();
 			}),
-		transition(state<Printing>,guard = [](auto& c, Timer*) {c.me.begin_ != c.me.end_; }
-
-			)
+		//print
+		transition("Initialized"_s, "Printing"_s,
+			guard = [](Print* p) { return p->data_[0] != '\0'; }	//only if event is print and buf is not empty
+			),
+		transition("Printing"_s,guard = [](auto& c, Timer*) {c.me.begin_ != c.me.end_; }),
+		transition("Printing"_s,"Initialized"_s,guard = [](auto& c, Timer*) {c.me.begin_ == c.me.end_; })
 		);
 }
