@@ -19,7 +19,7 @@ auto sm = makeSm(
     "otherState"_s, //we can leave out entry and exit if we don't need them
     
     //can overload onEntry depending on event type
-    "anotherState"_s{entry = [](auto& context, Ev2*){ /*only used if entry from an ev2*/}, entry = [](auto& context, void*){ /*used in all other cases*/}},
+    "anotherState"_s(entry = [](auto& context, Ev2*){ /*only used if entry from an ev2*/}, entry = [](auto& context, void*){ /*used in all other cases*/}),
     //states can also have parent states
     "someState"_s/"childState"_s(entry = doSomethingElse),  //state d is a substate of state b
     transition("someState"_s,"otherState"_s, guard = [](Ev1*e){ return e->i ==4;}), //normal transition with guard
