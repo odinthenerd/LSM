@@ -59,7 +59,7 @@ For this (pretty common) special case we provide multistep transitions. Internal
 
 This is what the multistep transition would look like (assuming named lambdas exist for actions and guards):
 ```C++
-transition("NotConnected"_s,"Done"_s>,
+transition("NotConnected"_s>>"Done"_s>,
     guard = userWantsToQuiry, 
     findDatabase,
     guard = databaseFound,
