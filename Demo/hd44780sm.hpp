@@ -5,10 +5,10 @@
 
 
 
-struct Init {};
-struct Print { const char*data_; };
-struct SetCursorToPosition { unsigned char x, y; };
-struct Timer {};
+struct Init {} init;
+struct Print { const char*data_; } print;
+struct SetCursorToPosition { unsigned char x, y; } setCursorToPosition;
+struct Timer {} timer;
 
 template<typename Config>
 auto makeHD44780sm(Config config) {
