@@ -59,20 +59,27 @@ For this (pretty common) special case we provide multistep transitions. Internal
 
 This is what the multistep transition would look like (assuming named lambdas exist for actions and guards):
 ```C++
-transition("NotConnected"_s>>"Done"_s>,
-    guard = userWantsToQuiry, 
-    findDatabase,
-    guard = databaseFound,
-    openDatabase,
-    guard = success,
-    rollback = closeDatabase,
-    openTable,
-    guard = success,
-    rollback = closeTable,
-    performQuery,
-    guard = success,
-    performOtherQuirey,
-    guard = success,
-    postResultToSomewhere)
-    
+auto sm = LSM::make(data = myData(db, queue), 
+    transition("Initial"_s>>"Final"_s>,
+        guard = [](auto& c, StartQuiery& q){ 
+            c.super.setQuieryString(q.string); 
+        },
+        rollback = [](auto& c){ c.super.postEv(DBFailed{}); },
+        findDatabase,
+        guard = databaseFound,
+        openDatabase,
+        guard = success,
+        onexit = [](auto& c){ c.super.db.close(); }
+        openTable,
+        guard = success,
+        rollback = closeTable,
+        performQuery,
+        guard = [](QType& ev){ 
+            return ev.event.value() == "something"; 
+        },
+        performOtherQuirey,
+        guard = success,
+        [](auto& c){ c.super.postEv(DBSuccess{}); },
+        )
+    );
 ```
