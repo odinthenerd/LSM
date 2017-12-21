@@ -1,3 +1,5 @@
+**sad to say this project has gone stale, it is not in a finished state and I am putting my work into other things**
+
 # LSM
 Lambda state machine is a state machine framework with an extremely simple API
 
